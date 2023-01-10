@@ -21,8 +21,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         http.csrf().disable()
                 .authorizeRequests()
-                .antMatchers(HttpMethod.GET, "/bookings/**").hasAnyRole("USER", "ADMIN")
-                .antMatchers(HttpMethod.POST, "/bookings/**").hasAnyRole("SYSTEM", "ADMIN")
+                .antMatchers(HttpMethod.POST, "/bookings").hasAnyRole("USER", "LOYALTY_USER", "ADMIN")
+                .antMatchers(HttpMethod.GET, "/bookings/**").hasAnyRole("USER", "LOYALTY_USER", "ADMIN")
+                .antMatchers(HttpMethod.POST, "/bookings/search").hasAnyRole("USER", "LOYALTY_USER", "ADMIN")
+                .antMatchers(HttpMethod.GET, "/v3/**").permitAll()
+                .antMatchers(HttpMethod.GET, "/swagger-ui.html").permitAll()
                 .anyRequest().denyAll()
                 .and()
                 .httpBasic();

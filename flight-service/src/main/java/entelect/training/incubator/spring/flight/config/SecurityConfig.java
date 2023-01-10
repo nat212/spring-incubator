@@ -28,6 +28,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
         auth.inMemoryAuthentication().withUser("user").password("{noop}the_cake").roles("USER");
+        auth.inMemoryAuthentication().withUser("loyalty").password("{noop}loyal").roles("LOYALTY_USER");
         auth.inMemoryAuthentication().withUser("admin").password("{noop}is_a_lie").roles("ADMIN");
     }
 
@@ -35,8 +36,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         http.csrf().disable() // !!! Disclaimer: NEVER DISABLE CSRF IN PRODUCTION !!!
                 .authorizeRequests()
-                .antMatchers(HttpMethod.GET, "/flights/**").hasAnyRole("USER", "ADMIN")
-                .antMatchers(HttpMethod.POST, "/flights/**").hasAnyRole("SYSTEM", "ADMIN")
+                .antMatchers(HttpMethod.GET, "/flights/specials").hasAnyRole("LOYALTY_USER", "ADMIN")
+                .antMatchers(HttpMethod.POST, "/flights").hasAnyRole("ADMIN")
+                .antMatchers(HttpMethod.GET, "/flights/**").permitAll()
+                .antMatchers(HttpMethod.GET, "/v3/**").permitAll()
+                .antMatchers(HttpMethod.GET, "/swagger-ui.html").permitAll()
                 .anyRequest().denyAll()
                 .and()
                 .httpBasic();

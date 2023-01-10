@@ -10,7 +10,12 @@ spring:
     hibernate:
       ddl-auto: create
 
+
 server:
   port: 8201
   error:
     include-message: always
+
+springdoc:
+  swagger-ui:
+    path: "/v3/swagger-ui.html"

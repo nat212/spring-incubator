@@ -9,6 +9,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create
+  activemq:
+    broker-url: tcp://localhost:61616
+    user: admin
+    password: admin
 
 server:
   port: 8203
@@ -23,3 +27,7 @@ customers:
   credentials:
     username: admin
     password: is_a_lie
+
+springdoc:
+  swagger-ui:
+    path: "/v3/swagger-ui.html"

@@ -5,6 +5,7 @@ import entelect.training.incubator.spring.flight.model.FlightsSearchRequest;
 import entelect.training.incubator.spring.flight.model.SearchType;
 import entelect.training.incubator.spring.flight.repository.FlightRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -55,21 +56,17 @@ public class FlightsService {
         final List<Flight> futureFlights = flightRepository.findByDepartureTimeBetweenDates(LocalDateTime.now(), LocalDateTime.now().plusDays(discountedFlightFutureDays));
 
         // pick random flights
-        final List<Flight> discountedFlights = futureFlights.stream()
+        return futureFlights.stream()
                 .collect(Collectors.collectingAndThen(Collectors.toList(), collected -> {
                     Collections.shuffle(collected);
                     return collected.stream();
                 }))
                 .limit(discountedFlightLimit)
-                .map(flight -> {
-                    flight.setSeatCost(flight.getSeatCost() * discountedRate);
-                    return flight;
-                })
+                .peek(flight -> flight.setSeatCost(flight.getSeatCost() * discountedRate))
                 .collect(Collectors.toList());
-
-        return discountedFlights;
     }
 
+    @Cacheable(cacheNames = {"flights"})
     public List<Flight> searchFlights(FlightsSearchRequest searchRequest) {
         Map<SearchType, Supplier<List<Flight>>> searchStrategies = new HashMap<>();
 

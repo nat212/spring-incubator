@@ -1,11 +1,18 @@
 package entelect.training.incubator.spring.booking.service;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import entelect.training.incubator.spring.booking.client.RewardsClient;
 import entelect.training.incubator.spring.booking.exception.CustomerNotFoundException;
 import entelect.training.incubator.spring.booking.exception.FlightNotFoundException;
 import entelect.training.incubator.spring.booking.model.Booking;
 import entelect.training.incubator.spring.booking.model.BookingSearchRequest;
+import entelect.training.incubator.spring.booking.model.Customer;
+import entelect.training.incubator.spring.booking.model.Flight;
+import entelect.training.incubator.spring.booking.queue.MessageCreator;
 import entelect.training.incubator.spring.booking.repository.BookingRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -44,19 +51,34 @@ public class BookingService {
 
     private final BookingRepository bookingRepository;
 
-    public BookingService(BookingRepository bookingRepository) {
+    private final RewardsClient rewardsClient;
+
+    private final ObjectMapper objectMapper;
+
+    @Autowired
+    private final MessageCreator messageCreator;
+
+    public BookingService(BookingRepository bookingRepository, RewardsClient rewardsClient, ObjectMapper objectMapper, MessageCreator messageCreator) {
         this.bookingRepository = bookingRepository;
+        this.rewardsClient = rewardsClient;
+        this.objectMapper = objectMapper;
+        this.messageCreator = messageCreator;
     }
 
     public Booking createBooking(Booking booking) throws CustomerNotFoundException, FlightNotFoundException {
-        getCustomer(booking.getCustomerId());
-        getFlight(booking.getFlightId());
+        Customer customer = getCustomer(booking.getCustomerId());
+        Flight flight = getFlight(booking.getFlightId());
         String referenceNumber = randomAlphabetic(3).toUpperCase() + randomNumeric(4);
         booking.setReferenceNumber(referenceNumber);
-        return bookingRepository.save(booking);
+        booking = bookingRepository.save(booking);
+        // Update rewards service.
+        rewardsClient.captureRewardsRequest(customer.getPassportNumber(), flight.getSeatCost());
+        String message = String.format("Molo Air: Confirming flight %s booked for %s on %s", flight.getFlightNumber(), customer.getFullName(), flight.getDepartureTime().toString());
+        messageCreator.sendMessage(customer.getPhoneNumber(), message);
+        return booking;
     }
 
-    private void getCustomer(Integer customerId) throws CustomerNotFoundException {
+    private Customer getCustomer(Integer customerId) throws CustomerNotFoundException {
         String url = customersApiUrl + "/{id}";
         String authString = customersUsername + ":" + customersPassword;
         String base64Creds = Base64.getEncoder().encodeToString(authString.getBytes());
@@ -64,16 +86,17 @@ public class BookingService {
         headers.add("Authorization", "Basic " + base64Creds);
         HttpEntity<?> request = new HttpEntity<>(headers);
         try {
-            ResponseEntity<?> response = new RestTemplate().exchange(url, HttpMethod.GET, request, Object.class, customerId);
+            ResponseEntity<JsonNode> response = new RestTemplate().exchange(url, HttpMethod.GET, request, JsonNode.class, customerId);
             if (response.getStatusCode().isError()) {
                 throw new CustomerNotFoundException();
             }
-        } catch (HttpClientErrorException ex) {
+            return objectMapper.convertValue(response.getBody(), Customer.class);
+        } catch (HttpClientErrorException | NullPointerException ex) {
             throw new CustomerNotFoundException();
         }
     }
 
-    private void getFlight(Integer flightId) throws FlightNotFoundException {
+    private Flight getFlight(Integer flightId) throws FlightNotFoundException {
         String url = flightsApiUrl + "/{id}";
         String authString = flightsUsername + ":" + flightsPassword;
         String base64Creds = Base64.getEncoder().encodeToString(authString.getBytes());
@@ -81,11 +104,12 @@ public class BookingService {
         headers.add("Authorization", "Basic " + base64Creds);
         HttpEntity<?> request = new HttpEntity<>(headers);
         try {
-            ResponseEntity<?> response = new RestTemplate().exchange(url, HttpMethod.GET, request, Object.class, flightId);
+            ResponseEntity<JsonNode> response = new RestTemplate().exchange(url, HttpMethod.GET, request, JsonNode.class, flightId);
             if (response.getStatusCode().isError()) {
                 throw new FlightNotFoundException();
             }
-        } catch (HttpClientErrorException ex) {
+            return objectMapper.convertValue(response.getBody(), Flight.class);
+        } catch (HttpClientErrorException | NullPointerException ex) {
             throw new FlightNotFoundException();
         }
     }

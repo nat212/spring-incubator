@@ -37,6 +37,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .authorizeRequests()
                 .antMatchers(HttpMethod.GET, "/customers/**").hasAnyRole("USER", "ADMIN")
                 .antMatchers(HttpMethod.POST, "/customers/**").hasAnyRole("SYSTEM", "ADMIN")
+                .antMatchers(HttpMethod.GET, "/v3/**").permitAll()
+                .antMatchers(HttpMethod.GET, "/swagger-ui.html").permitAll()
                 .anyRequest().denyAll()
                 .and()
                 .httpBasic();
